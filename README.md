@@ -15,6 +15,6 @@
 
 ### Notes
 
-* Some environment variables have already been provided using a sandbox. You can override .env with your own tokens.
+* Some environment variables have already been provided using a sandbox. You can override `.env` file with your own tokens.
 * The payment result for credit cards and Google Pay is displayed at the top of the left block
 
