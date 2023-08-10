@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>T-shirts shop</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+
+    <style>
+        body {
+            background-color: #8C9E6E;
+            color:#FFFFFD;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="mt-4"><img src="{{ asset('img/logo.png') }}" alt="logo" width="100"> T-shirt shop</h1>
+
+    <div class="row mt-4">
+        <div class="col-12 col-md-4 p-2" style="background-color: #323416;">
+            <h2>Payment</h2>
+
+            <div class="form-group">
+                <label for="customer_firstname">Customer first name (mandatory)</label>
+                <input type="text" class="form-control" id="customer_firstname" placeholder="Enter firstname">
+            </div>
+
+            <div class="form-group">
+                <label for="customer_lastname">Customer last name (mandatory)</label>
+                <input type="text" class="form-control" id="customer_lastname" placeholder="Enter lastname">
+            </div>
+
+            <div class="form-group">
+                <label for="customer_lastname">Customer email (mandatory)</label>
+                <input type="email" class="form-control" id="customer_email" placeholder="Enter email">
+            </div>
+
+            <p class="mt-3">Result: <span class="font-weight-bold text-uppercase" id="result"></span></p>
+
+            <hr>
+
+            <h3>Credit card</h3>
+            <form id="payment-form" method="POST" action="#">
+                <div class="card-frame">
+
+                </div>
+                <button id="pay-button" class="btn btn-primary" disabled>Pay {{ product.price / 100 }} € with card</button>
+            </form>
+
+            <div class="d-none" id="google-pay-div">
+                <hr>
+
+                <h3>Google Pay</h3>
+
+                <button id="pay-google-button" class="btn btn-primary">Pay {{ product.price / 100 }} € with Google Pay</button>
+
+                <p id="google_pay_result_p" class="d-none">Payment result: <span id="google_pay_result" class="bold"></span> </p>
+            </div>
+
+            <hr>
+
+            <h3>Giropay</h3>
+            <button id="pay-giropay-button" class="btn btn-primary">Pay {{ product.price / 100 }} € with Giropay</button>
+        </div>
+
+        <div class="col-12 offset-md-4 col-md-4 p-2" style="background-color: #323416;">
+            <h2>Order details</h2>
+            <div class="border border-white p-2">
+                <p>{{ product.name }}</p>
+                <p>{{ product.price / 100 }} €</p>
+            </div>
+        </div>
+    </div>
+</div> <!-- /container -->
+<script src="https://cdn.checkout.com/js/framesv2.min.js"></script>
+<script src="https://pay.google.com/gp/p/js/pay.js"></script>
+
+
+<script>
+    const baseRequest = {
+        apiVersion: 2,
+        apiVersionMinor: 0
+    };
+
+    const baseCardPaymentMethod = {
+        "type": "CARD",
+        "parameters": {
+            "allowedAuthMethods": ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+            "allowedCardNetworks": ["AMEX", "DISCOVER", "JCB", "MASTERCARD", "VISA"]
+        },
+    };
+
+    const tokenizationSpecification = {
+        "type": "PAYMENT_GATEWAY",
+        "parameters": {
+            "gateway": "checkoutltd",
+            "gatewayMerchantId": "{{ checkout_public_key }}"
+        }
+    };
+
+    const cardPaymentMethod = Object.assign(
+        {tokenizationSpecification: tokenizationSpecification},
+        baseCardPaymentMethod
+    );
+
+    const paymentsClient = new google.payments.api.PaymentsClient({environment: 'TEST'});
+
+    const isReadyToPayRequest = Object.assign({}, baseRequest);
+    isReadyToPayRequest.allowedPaymentMethods = [baseCardPaymentMethod];
+
+    var payButton = document.getElementById('pay-button');
+    var payGoogleButton = document.getElementById('pay-google-button');
+    var payGiropayButton = document.getElementById('pay-giropay-button');
+    var form = document.getElementById('payment-form');
+    var customerFirstNameInput = document.getElementById('customer_firstname');
+    var customerLastNameInput = document.getElementById('customer_lastname');
+    var customerEmailInput = document.getElementById('customer_email');
+    var result = document.getElementById('result');
+
+    paymentsClient.isReadyToPay(isReadyToPayRequest)
+        .then(function(response) {
+            if (response.result) {
+                document.getElementById('google-pay-div').classList.remove('d-none');
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+        });
+
+    Frames.init({
+        publicKey: '{{ checkout_public_key }}',
+        style: {
+            base: {
+                color: '#FFFFFD',
+            },
+        },
+    });
+    Frames.addEventHandler(Frames.Events.CARD_VALIDATION_CHANGED, function (event) {
+        payButton.disabled = !Frames.isCardValid();
+    });
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        result.textContent = ''
+
+        if (!checkIfInputIsFilled(customerFirstNameInput) || !checkIfInputIsFilled(customerLastNameInput) || !checkIfInputIsFilled(customerEmailInput)) {
+            alert("Please fill mandatory input");
+
+            return;
+        }
+
+        name = customerFirstNameInput.value+" "+customerLastNameInput.value
+
+        Frames.cardholder = {
+            name: name
+        };
+
+        Frames.submitCard()
+        .then(function (data) {
+            xhr = charge(data.token, name, customerEmailInput.value);
+
+            if (xhr.status == 200) {
+                result.innerText = JSON.parse(xhr.responseText).status
+            } else {
+                result.innerHTML = "Something went wrong, check the informations you provided"
+            }
+
+            Frames.init()
+        })
+        .catch(function (error) {
+            alert("Something went wrong")
+
+            Frames.init()
+        });
+    });
+
+    payGoogleButton.addEventListener('click', function (event) {
+        const paymentDataRequest = Object.assign({}, baseRequest);
+        result.textContent = '';
+
+        paymentDataRequest.allowedPaymentMethods = [cardPaymentMethod];
+
+        paymentDataRequest.transactionInfo = {
+            totalPriceStatus: 'FINAL',
+            totalPrice: '{{ product.price / 100 }}',
+            currencyCode: 'EUR',
+            countryCode: 'DE'
+        };
+
+        paymentDataRequest.merchantInfo = {
+            merchantName: 'T-shirt shop',
+            merchantId: '12345678901234567890'
+        };
+
+        if (!checkIfInputIsFilled(customerFirstNameInput) || !checkIfInputIsFilled(customerLastNameInput) || !checkIfInputIsFilled(customerEmailInput)) {
+            alert("Please fill mandatory input");
+
+            return;
+        }
+
+        paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
+            // if using gateway tokenization, pass this token without modification
+            paymentToken = JSON.parse(paymentData.paymentMethodData.tokenizationData.token);
+            name = customerFirstNameInput.value + " " + customerLastNameInput.value
+            xhrGoogle = createGooglePayToken(paymentToken, name)
+
+            if (xhrGoogle.status == 201) {
+                xhr = charge(JSON.parse(xhrGoogle.responseText).token, name, customerEmailInput.value);
+
+                if (xhr.status == 200) {
+                    result.innerHTML = JSON.parse(xhr.responseText).status
+                } else {
+                    result.innerHTML = "Something went wrong, check the informations you provided"
+                }
+            } else if (xhrGoogle.status >= 400 || xhr.status < 500) {
+                console.log(JSON.parse(xhrGoogle.responseText).error);
+            } else {
+                console.log("Something went wrong");
+            }
+        }).catch(function (err) {
+            // show error in developer console for debugging
+            console.error(err);
+        });
+    });
+
+    payGiropayButton.addEventListener('click', function (event) {
+        result.textContent = ''
+
+        if (!checkIfInputIsFilled(customerFirstNameInput) || !checkIfInputIsFilled(customerLastNameInput) || !checkIfInputIsFilled(customerEmailInput)) {
+            alert("Please fill mandatory input");
+
+            return;
+        }
+
+        xhr = createGiropayPaymentRequest(customerFirstNameInput.value, customerLastNameInput.value, customerEmailInput.value);
+
+        if (xhr.status == 200) {
+            alert("You will be redirect to your bank provider");
+            window.location.href = JSON.parse(xhr.responseText).link;
+        } else if (xhr.status == 400) {
+            alert("Something went wrong, check the informations you provided");
+        } else {
+            alert("Something went wrong");
+        }
+    })
+
+    function charge(token, customer_name, email)
+    {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/charge", false);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send("token_id="+token+"&customer_name="+customer_name+"&email="+email);
+
+        return xhr;
+    }
+
+    function createGiropayPaymentRequest(firstname, lastname, email)
+    {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/giropay/create", false);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send("firstname="+firstname+"&lastname="+lastname+"&email="+email);
+
+        return xhr;
+    }
+
+    function createGooglePayToken(paymentToken)
+    {
+        var xhr = new XMLHttpRequest();   // new HttpRequest instance
+        xhr.open("POST", "https://api.sandbox.checkout.com/tokens", false);
+        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        xhr.setRequestHeader("Authorization", "Bearer {{ checkout_public_key }}");
+        xhr.send(JSON.stringify({"type": "googlepay", "token_data": paymentToken}));
+
+        return xhr;
+    }
+
+    function checkIfInputIsFilled(input)
+    {
+        return !(input.value.length == 0)
+    }
+</script>
+
+</body>
+</html>

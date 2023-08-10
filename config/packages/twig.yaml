@@ -1,0 +1,8 @@
+twig:
+    default_path: '%kernel.project_dir%/templates'
+    globals:
+        checkout_public_key: '%env(CHECKOUT_PUBLIC_KEY)%'
+
+when@test:
+    twig:
+        strict_variables: true
