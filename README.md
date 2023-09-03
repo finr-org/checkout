@@ -9,7 +9,7 @@
 ### Launch
 
 * Run `composer install` for downloading the dependencies
-* Run `symfony server:run` for running a local HTTP server
+* Run `symfony server:start` for running a local HTTP server
 * Go on the link displayed on the console, can be [localhost:8000](https://localhost:8000/) for example
 
 
